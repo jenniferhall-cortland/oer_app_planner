@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OER App Planner</title>
+<meta name="description" content="Plan a small interactive learning app, generate a build prompt for an AI tool, and check the result before it reaches students.">
+<style>
+:root{
+  --paper:#ffffff; --panel:#f6f2f1; --ink:#221c1c; --muted:#5a5050; --line:#ddd3d1;
+  --red:#d71e25; --maroon:#85181c; --on-accent:#ffffff;
+  --ok:#1d6b3a; --warn:#7d5200; --bad:#b0171d; --soft:#fbe9e9; --focus:#1a5fb4;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#181414; --panel:#231d1d; --ink:#f1ebea; --muted:#c3b7b6; --line:#3d3333;
+    --red:#ff6b70; --maroon:#ff9a9d; --on-accent:#1a0c0c;
+    --ok:#6fd49a; --warn:#f0c060; --bad:#ff8a8e; --soft:#3a2224; --focus:#8ab8ff;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#181414; --panel:#231d1d; --ink:#f1ebea; --muted:#c3b7b6; --line:#3d3333;
+  --red:#ff6b70; --maroon:#ff9a9d; --on-accent:#1a0c0c;
+  --ok:#6fd49a; --warn:#f0c060; --bad:#ff8a8e; --soft:#3a2224; --focus:#8ab8ff;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:1.0625rem;line-height:1.55}
+a{color:var(--maroon)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--paper);padding:.6rem 1rem;z-index:20}
+.skip:focus{left:1rem;top:1rem}
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+header.rail{border-right:1px solid var(--line);padding:1.8rem 1.25rem;position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
+.mark{font-family:var(--serif);font-size:1.5rem;line-height:1.15;margin:0 0 .3rem;color:var(--maroon)}
+.tag{margin:0 0 1.8rem;color:var(--muted);font-size:.92rem}
+nav ol{list-style:none;margin:0;padding:0;counter-reset:step}
+nav li{margin-bottom:.3rem}
+nav button{counter-increment:step;display:flex;gap:.7rem;align-items:center;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:.55rem .6rem;font:inherit;color:var(--ink);cursor:pointer}
+nav button::before{content:counter(step);flex:0 0 1.8rem;height:1.8rem;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:.88rem}
+nav button[aria-current="step"]{border-left-color:var(--red);background:var(--panel)}
+nav button[aria-current="step"]::before{background:var(--red);border-color:var(--red);color:var(--on-accent)}
+nav button.done::before{border-color:var(--maroon);color:var(--maroon)}
+.meter{margin-top:1.6rem;font-size:.9rem;color:var(--muted)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:.4rem}
+.bar span{display:block;height:100%;width:0;background:var(--red);transition:width .3s}
+.rail .note{font-size:.88rem;color:var(--muted);margin-top:1.5rem}
+main{padding:2.4rem clamp(1.1rem,4vw,3.4rem) 4rem;max-width:940px}
+h1,h2,h3{font-family:var(--serif);line-height:1.2;margin:0 0 .5rem}
+h1{font-size:clamp(1.8rem,3.4vw,2.4rem)}
+h2{font-size:1.4rem;margin-top:2rem}
+h3{font-size:1.1rem}
+.lead{font-size:1.12rem;color:var(--muted);max-width:62ch;margin:0 0 1.8rem}
+section[hidden]{display:none}
+.field{border-top:1px solid var(--line);padding:1.3rem 0}
+.field label{display:block;font-weight:700;margin-bottom:.15rem}
+.hint{color:var(--muted);font-size:.95rem;margin:0 0 .55rem;max-width:68ch}
+textarea,input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:.55rem .7rem}
+textarea{min-height:4.4rem;resize:vertical}
+textarea:focus,input:focus{border-color:var(--maroon)}
+details{margin-top:.6rem;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+details[open]{border-color:var(--maroon)}
+summary{cursor:pointer;padding:.55rem .8rem;font-weight:700;font-size:.95rem;color:var(--maroon);list-style-position:inside}
+summary:hover{background:var(--soft)}
+.det-body{padding:0 .9rem .9rem;font-size:.97rem}
+.det-body p{margin:.4rem 0}
+.det-body ul{margin:.4rem 0;padding-left:1.2rem}
+.det-body li{margin:.3rem 0}
+.eg{color:var(--muted);font-style:italic}
+.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-top:.7rem}
+.btn{font:inherit;font-weight:700;border-radius:6px;padding:.52rem 1rem;border:2px solid var(--maroon);background:var(--paper);color:var(--maroon);cursor:pointer;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--red);border-color:var(--red);color:var(--on-accent)}
+.btn.primary:hover{background:var(--maroon);border-color:var(--maroon)}
+.btn.small{padding:.28rem .65rem;font-size:.9rem;border-width:1.5px}
+.card{background:var(--panel);border-radius:8px;padding:1.1rem 1.3rem;margin:1rem 0}
+.verdict{font-family:var(--serif);font-size:1.25rem;margin:0 0 .35rem}
+.verdict.ready{color:var(--ok)} .verdict.almost{color:var(--warn)} .verdict.work{color:var(--bad)}
+ul.clean{margin:.4rem 0 0;padding-left:1.2rem}
+ul.clean li{margin:.35rem 0}
+.status{min-height:1.4em;font-size:.95rem;color:var(--muted)}
+.linkish{background:none;border:0;padding:0;font:inherit;color:var(--maroon);text-decoration:underline;cursor:pointer}
+pre.prompt{white-space:pre-wrap;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.15rem;font-family:var(--sans);font-size:.95rem;max-height:460px;overflow:auto}
+table.scan{width:100%;border-collapse:collapse;margin:.6rem 0;font-size:.95rem}
+table.scan th,table.scan td{border-bottom:1px solid var(--line);padding:.5rem .4rem;text-align:left;vertical-align:top}
+.pill{display:inline-block;font-weight:700;font-size:.8rem;padding:.08rem .5rem;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.pill.pass{color:var(--ok)} .pill.flag{color:var(--bad)} .pill.check{color:var(--warn)}
+.scroll{overflow-x:auto}
+fieldset{border:0;padding:0;margin:1.1rem 0}
+legend{font-family:var(--serif);font-weight:700;font-size:1.08rem;margin-bottom:.3rem}
+.check-item{display:flex;gap:.6rem;align-items:flex-start;margin:.4rem 0}
+.check-item input{margin-top:.33rem;width:1.1rem;height:1.1rem;accent-color:var(--red)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tools{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem}
+@media (max-width:820px){
+  .shell{grid-template-columns:1fr}
+  header.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:1.1rem}
+  .tag{margin-bottom:1rem}
+  nav ol{display:grid;grid-template-columns:1fr 1fr;gap:.3rem}
+  .meter{margin-top:1rem}
+}
+@media print{
+  header.rail,.row,nav,.btn{display:none!important}
+  .shell{display:block}
+  main{max-width:none;padding:0}
+  details{border:0;background:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <header class="rail">
+    <p class="mark">OER App Planner</p>
+    <p class="tag">Plan it, prompt it, check it.</p>
+    <nav aria-label="Steps">
+      <ol>
+        <li><button type="button" data-step="brief" aria-current="step">Plan your app</button></li>
+        <li><button type="button" data-step="check">Check your plan</button></li>
+        <li><button type="button" data-step="prompt">Get your prompt</button></li>
+        <li><button type="button" data-step="safety">Check the result</button></li>
+      </ol>
+    </nav>
+    <div class="meter"><span id="meterText" aria-live="polite">0 of 12 answered</span><div class="bar" aria-hidden="true"><span id="meterBar"></span></div></div>
+    <p class="note">Everything stays in this browser. Nothing is uploaded, and no account is needed.</p>
+    <div class="row"><button class="btn small" type="button" id="themeBtn" aria-pressed="false">Dark mode</button></div>
+  </header>
+
+  <main id="main" tabindex="-1">
+
+    <!-- 1. BRIEF -->
+    <section id="step-brief" aria-labelledby="h1b">
+      <h1 id="h1b">Plan one small app that solves one learning problem</h1>
+      <p class="lead">Answer in your own words. Each question has a <strong>Need help?</strong> panel with coaching questions and examples if you want them. Your answers become the prompt in step 3.</p>
+      <div id="fields"></div>
+      <div class="row" style="margin-top:1.4rem">
+        <button class="btn primary" type="button" data-go="check">Check my plan</button>
+        <button class="btn" type="button" id="dlBrief">Download brief</button>
+        <button class="btn" type="button" id="copyBrief">Copy brief</button>
+        <button class="btn" type="button" id="clearAll">Start over</button>
+      </div>
+      <p class="status" id="briefStatus" role="status"></p>
+    </section>
+
+    <!-- 2. CHECK PLAN -->
+    <section id="step-check" aria-labelledby="h2c" hidden>
+      <h1 id="h2c">Is your plan ready to build?</h1>
+      <p class="lead">This runs a few plain checks on what you wrote. It is a nudge, not a grade, so use your judgment about what matters for your course.</p>
+      <div class="row"><button class="btn primary" type="button" id="planBtn">Run the check</button></div>
+      <p class="status" id="planStatus" role="status"></p>
+      <div id="planOut" aria-live="polite"></div>
+
+      <h2>What makes a first app succeed</h2>
+      <details>
+        <summary>Keep the scope to one skill</summary>
+        <div class="det-body">
+          <p>The apps that work are small. One skill, one kind of activity, one sitting of about five to ten minutes.</p>
+          <ul>
+            <li><span class="eg">Too big:</span> an app that teaches the whole unit on cell division.</li>
+            <li><span class="eg">Right size:</span> a drill where students put the phases of mitosis in order and get told which pair they swapped.</li>
+          </ul>
+          <p>You can always add to it later. A small app that works beats a large one that half works.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Put your effort into the wrong-answer feedback</summary>
+        <div class="det-body">
+          <p>Telling a student they are wrong teaches nothing. Telling them <em>which</em> part went wrong teaches the skill.</p>
+          <ul>
+            <li>Name the specific error: "Your units didn't cancel. Look at the milligrams."</li>
+            <li>Give a hint, then let them try again, rather than showing the answer at once.</li>
+            <li>Write different feedback for the common wrong answers you already see in class.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Expect to iterate, and change one thing at a time</summary>
+        <div class="det-body">
+          <p>Vibe coding is a conversation, not a single request. Plan on five to fifteen rounds of "change this, fix that."</p>
+          <ul>
+            <li>Ask for one change per message. Several at once makes it hard to see what broke.</li>
+            <li>Save a copy of each version that works before asking for a big change. Number them: <span class="mono">app-v1.html</span>, <span class="mono">app-v2.html</span>.</li>
+            <li>Describe problems concretely: "The Next button does nothing after question 3" beats "it's broken." Paste in any error message you see.</li>
+            <li>Describe behavior, not code. "When a student answers wrong, show a hint and let them retry" is all the AI needs.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>You are the expert; the AI is the typist</summary>
+        <div class="det-body">
+          <p>AI writes confident prose whether or not it is correct. It will invent plausible drug doses, dates, citations, and formulas.</p>
+          <ul>
+            <li>Check every question, answer key, explanation, and piece of feedback yourself before students see it.</li>
+            <li>Supply your own content where accuracy matters. Paste your problems in rather than asking the AI to invent them.</li>
+            <li>Ask it to explain its work: "Explain what this code does in plain language" and "Does this app send any information anywhere?"</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Use content you are allowed to use</summary>
+        <div class="det-body">
+          <p>An open educational resource has to be clean on rights all the way down.</p>
+          <ul>
+            <li>Safest sources: material you wrote, public domain works, and openly licensed material such as OpenStax or other CC-licensed resources.</li>
+            <li>Not safe: publisher test banks, figures scanned from a textbook, and images pulled from a web search.</li>
+            <li>Keep a note of each source and its license. You will need it when you publish.</li>
+            <li>CC BY 4.0 is a common default: others may reuse and adapt your app as long as they credit you.</li>
+          </ul>
+        </div>
+      </details>
+      <div class="row" style="margin-top:1.4rem">
+        <button class="btn" type="button" data-go="brief">Back to plan</button>
+        <button class="btn primary" type="button" data-go="prompt">Get my prompt</button>
+      </div>
+    </section>
+
+    <!-- 3. PROMPT -->
+    <section id="step-prompt" aria-labelledby="h3p" hidden>
+      <h1 id="h3p">Your build prompt</h1>
+      <p class="lead">Copy this into any AI assistant that writes code. It combines your plan with the privacy, accessibility, and LMS requirements, so you do not have to remember them.</p>
+
+      <fieldset>
+        <legend class="sr">Prompt options</legend>
+        <div class="check-item"><input type="checkbox" id="optLMS" checked><label for="optLMS">Include LMS compatibility rules (older JavaScript that uploads cleanly into Brightspace and similar systems)</label></div>
+        <div class="check-item"><input type="checkbox" id="optSteps"><label for="optSteps">Ask the AI to build in stages and check with me between each one</label></div>
+        <div class="check-item"><input type="checkbox" id="optExplain" checked><label for="optExplain">Ask for a plain-language summary and a short test list after the code</label></div>
+      </fieldset>
+
+      <pre class="prompt" id="promptBox" tabindex="0" aria-label="Your build prompt"></pre>
+      <div class="row">
+        <button class="btn primary" type="button" id="copyPrompt">Copy prompt</button>
+        <button class="btn" type="button" id="dlPrompt">Download prompt</button>
+      </div>
+      <p class="status" id="copyStatus" role="status"></p>
+      <p class="hint">Open your AI tool, paste the prompt, and send it. Keep that chat open so you can ask for changes.</p>
+      <div class="tools">
+        <a class="btn small" href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a>
+        <a class="btn small" href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a>
+        <a class="btn small" href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>
+        <a class="btn small" href="https://copilot.microsoft.com/" target="_blank" rel="noopener">Microsoft Copilot</a>
+      </div>
+
+      <h2>Follow-up prompts that usually help</h2>
+      <details>
+        <summary>Improving the teaching</summary>
+        <div class="det-body">
+          <ul>
+            <li>"Make the feedback explain why the answer is wrong, not just that it is wrong."</li>
+            <li>"Add a short hint students can reveal before they answer."</li>
+            <li>"Here are the five wrong answers my students give most often. Write specific feedback for each."</li>
+            <li>"Add a brief summary at the end showing which problem types the student missed."</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Fixing what's broken</summary>
+        <div class="det-body">
+          <ul>
+            <li>"The Next button does nothing after question 3. Fix it and tell me what was wrong."</li>
+            <li>"On my phone the buttons run off the side of the screen. Make the layout fit narrow screens."</li>
+            <li>"I'm seeing this error in the browser console: [paste it]. What is causing it?"</li>
+            <li>"Go back to the version before the last change and start again from there."</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Accessibility and safety</summary>
+        <div class="det-body">
+          <ul>
+            <li>"Check this app against WCAG 2.1 AA and fix everything you find."</li>
+            <li>"Make sure every control works with the keyboard alone and has a visible focus outline."</li>
+            <li>"Announce right and wrong feedback to screen readers using aria-live."</li>
+            <li>"List every place this code connects to the internet, stores information, or loads an outside file."</li>
+            <li>"Rewrite this using only ES5 JavaScript so it works in our LMS."</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Saving and keeping track of versions</summary>
+        <div class="det-body">
+          <p>AI tools lose track of earlier versions. Keep your own copies.</p>
+          <ul>
+            <li>Save the code to a file whenever it works. Name files in order: <span class="mono">app-v1.html</span>, <span class="mono">app-v2.html</span>.</li>
+            <li>To save: copy the code, paste it into a plain text editor (Notepad or TextEdit in plain text mode), and save it with an <span class="mono">.html</span> ending.</li>
+            <li>To test: double-click the file. It opens in your browser and runs.</li>
+            <li>If a change makes things worse, open your last good file and paste it back into the chat: "Go back to this version and make this change instead."</li>
+          </ul>
+        </div>
+      </details>
+      <div class="row" style="margin-top:1.4rem">
+        <button class="btn" type="button" data-go="check">Back</button>
+        <button class="btn primary" type="button" data-go="safety">Check my app</button>
+      </div>
+    </section>
+
+    <!-- 4. SAFETY -->
+    <section id="step-safety" aria-labelledby="h4s" hidden>
+      <h1 id="h4s">Check the app before students see it</h1>
+      <p class="lead">Paste the HTML your AI tool produced. The scan runs entirely in your browser and looks for data collection, outside connections, and common accessibility and LMS problems.</p>
+      <div class="field" style="border-top:0">
+        <label for="codeIn">App code</label>
+        <p class="hint">Copy everything the AI gave you, starting at <span class="mono">&lt;!DOCTYPE html&gt;</span>.</p>
+        <textarea id="codeIn" class="mono" style="min-height:10rem"></textarea>
+        <div class="row">
+          <button class="btn primary" type="button" id="scanBtn">Run the scan</button>
+          <button class="btn" type="button" id="tryBtn">Preview the app</button>
+        </div>
+        <p class="status" id="scanStatus" role="status"></p>
+      </div>
+      <div id="scanOut" aria-live="polite"></div>
+
+      <details>
+        <summary>What the scan can and cannot tell you</summary>
+        <div class="det-body">
+          <p>The scan looks for text patterns. It catches the common problems, but it can miss something and it can flag harmless code. It is a first pass, not an approval.</p>
+          <p>It cannot judge whether your content is accurate, whether the activity teaches what you intended, or whether a screen reader actually makes sense of the app. Only you and a human reviewer can do that.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Why "no outside connections" matters</summary>
+        <div class="det-body">
+          <p>If an app sends anything to another server, student work may leave your institution's control, which raises FERPA questions and campus review requirements.</p>
+          <ul>
+            <li>A self-contained file avoids this entirely: nothing leaves the student's browser.</li>
+            <li>Watch for <span class="mono">fetch</span>, <span class="mono">XMLHttpRequest</span>, a <span class="mono">&lt;form&gt;</span> with an action, and script or image tags pointing at <span class="mono">http</span> addresses.</li>
+            <li>Never collect names, student IDs, or email addresses. Let the LMS handle identity, and let the app handle practice.</li>
+            <li>If something must be saved, keep it in the student's own browser and store nothing identifying.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Accessibility: the quick version</summary>
+        <div class="det-body">
+          <p>Accessibility is a legal obligation and the difference between an app some students can use and one every student can use.</p>
+          <ul>
+            <li><strong>Keyboard:</strong> put your mouse aside and press Tab. You should be able to reach and operate everything, and always see where you are.</li>
+            <li><strong>Announcements:</strong> feedback that appears after an answer should be announced, usually with <span class="mono">aria-live</span>.</li>
+            <li><strong>Color:</strong> never let color be the only signal. Add a word or an icon next to the green and the red.</li>
+            <li><strong>Contrast and text:</strong> at least 4.5:1, and the layout should survive zooming to 200%.</li>
+            <li><strong>Images and media:</strong> alt text on images, captions or transcripts for audio and video.</li>
+            <li><strong>Check it:</strong> free tools such as WAVE or axe DevTools catch much of this in seconds.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Putting it in your LMS</summary>
+        <div class="det-body">
+          <ul>
+            <li>Save the finished code as a file ending in <span class="mono">.html</span>.</li>
+            <li>Upload it to a sandbox or practice course first, not your live course.</li>
+            <li>Open it in student view and test it on both a computer and a phone.</li>
+            <li>Then add it to your live course as a content item and check student view once more before releasing it.</li>
+            <li>Some systems restrict what uploaded pages may do. If it works on your computer but not in the LMS, ask your teaching center or LMS administrator.</li>
+          </ul>
+        </div>
+      </details>
+
+      <h2>Your final checklist</h2>
+      <p class="hint">Some things only a person can confirm. Tick each one you have checked yourself.</p>
+      <div id="checklist"></div>
+      <div class="row" style="margin-top:1.3rem">
+        <button class="btn primary" type="button" id="dlPacket">Download summary</button>
+        <button class="btn" type="button" id="copyPacket">Copy summary</button>
+        <button class="btn" type="button" onclick="window.print()">Print this page</button>
+      </div>
+      <p class="hint">The summary holds your plan, the scan results, and your checklist. Keep it with your app file, or send it to whoever reviews your work.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var FIELDS = [
+  {k:"name", label:"Your name and department", hint:"This appears in the app's footer as the author.", ph:"Dr. Ana Ruiz, Nursing", small:true,
+   help:{q:["Whose name should students see if they have a question?"], eg:["Dr. Ana Ruiz, Department of Nursing"]}},
+  {k:"course", label:"Course number and title", hint:"", ph:"NUR 210: Foundations of Pharmacology", small:true,
+   help:{q:["Will you reuse this in other courses? If so, keep the wording general."], eg:["NUR 210: Foundations of Pharmacology"]}},
+  {k:"problem", label:"Learning problem: what do students struggle with?", hint:"Name one specific skill or misconception, not a whole unit.",
+   ph:"Students set up dosage calculations with units that don't cancel.",
+   help:{q:["Where do students lose points on the same question every semester?","What do you find yourself re-explaining in office hours?","Is this one skill, or several? If several, pick the one that blocks the rest."],
+     eg:["Students can state the formula but set the ratio upside down.","Students confuse weathering with erosion when both appear in a diagram.","Students write a thesis that restates the prompt instead of making a claim."]}},
+  {k:"goal", label:"Learning goal: after using the app, students will be able to...", hint:"Use a verb you could observe: calculate, classify, choose, order, explain.",
+   ph:"...calculate an oral dose from an order and a stock concentration.",
+   help:{q:["Could you tell from watching a student whether they have done it?","Does it match the problem you just named?"],
+     p:"Avoid \u201cunderstand\u201d and \u201cbe familiar with.\u201d You cannot see either one happen.",
+     eg:["...set up a dosage calculation so the units cancel correctly.","...classify an unlabeled rock sample as igneous, sedimentary, or metamorphic.","...identify the claim in a paragraph and distinguish it from evidence."]}},
+  {k:"learners", label:"Who are the learners?", hint:"Level, what they already know, and the devices they use.",
+   ph:"Second-year nursing students; comfortable with ratios; mostly on phones.",
+   help:{q:["What can you assume they already know, and what must the app explain?","Is this a required course with a wide range of preparation?","Will they use this on a phone between classes, or at a desk?"],
+     p:"Device matters. If they are on phones, say so, and the app will be built to fit a small screen.",
+     eg:["First-year non-majors, no prior chemistry, using laptops in a computer lab.","Graduate students returning to school after years away; mixed comfort with technology."]}},
+  {k:"does", label:"What does the student do in the app?", hint:"Walk through one student's visit from start to finish.",
+   ph:"Sees a medication order, enters a dose, checks it, then gets a new problem.",
+   help:{q:["What is on the screen when it opens?","What is the first thing they click or type?","What happens next, and how do they know they are finished?"],
+     p:"Describe it as actions, not features. \u201cThe student drags each term onto the matching definition\u201d tells an AI far more than \u201ca matching activity.\u201d",
+     eg:["Reads a short case, picks one of four next steps, sees what results, and continues through three decisions.","Sees an unlabeled diagram and types the name of each part, one at a time."]}},
+  {k:"feedback", label:"What feedback do they get when right? When wrong?", hint:"This is where most of the learning happens. Be specific about wrong answers.",
+   ph:"Right: brief confirmation with the setup shown. Wrong: a hint about which unit didn't cancel, then a retry.",
+   help:{q:["What are the two or three wrong answers you see most often?","What would you say to that student in office hours?","Should they retry, or see the worked answer?"],
+     p:"\u201cTry again\u201d teaches nothing. Name the specific error and point to the next move.",
+     eg:["If they invert the ratio, say which number belongs on top and let them retry once before showing the setup.","If they pick the sedimentary answer for a banded sample, point them to the texture, not the color."]}},
+  {k:"type", label:"App type", hint:"Drill, quiz, case scenario, simulation, interactive diagram, flashcards, sorting activity, or something else.",
+   ph:"Drill with randomized problems",
+   help:{q:["Is the student practicing a procedure, making decisions, or recalling facts?"],
+     p:"Practicing a procedure suits a drill with randomized values. Making decisions suits a branching case. Recall suits flashcards or a sorting activity.",
+     eg:["Randomized drill, ten problems per session","Branching case scenario with three decision points","Sorting activity: drag twelve examples into three categories"]}},
+  {k:"fit", label:"Where does it fit in the course?", hint:"Before, during, or after which topic, and whether it is graded.",
+   ph:"Practice after the Week 4 lecture, ungraded, before the Week 5 quiz.",
+   help:{q:["What must students already know before this will make sense?","Is it preparation, practice, or review?","Graded or not? If graded, how will you record it?"],
+     p:"A self-contained app cannot send grades to your LMS. If you need points, use completion or an honor-system reflection, and keep grading in the LMS.",
+     eg:["Assigned as practice between the lecture and the lab, ungraded.","Optional review before the midterm, open all semester."]}},
+  {k:"done", label:"What does \"done\" look like?", hint:"Your minimum working version. Extra features can come later.",
+   ph:"Ten problem templates, hints, retry, and a session score.",
+   help:{q:["What is the smallest version you would still assign?","Which features are nice but not necessary for the first try?"],
+     p:"Keep the first build small. You can add to it once you have seen students use it.",
+     eg:["Eight questions with feedback and a score. Timers and leaderboards can wait.","One case with three decisions. More cases later if it works."]}},
+  {k:"sources", label:"Content sources you will draw on, and who owns them", hint:"Your own material and openly licensed material are safest.",
+   ph:"My own practice problems; OpenStax Pharmacology (CC BY 4.0).",
+   help:{q:["Did you write this content, or did it come from somewhere else?","If it came from elsewhere, what license does it carry?"],
+     p:"Do not use publisher test banks, scanned textbook figures, or images from a web search. Write your own, or use openly licensed sources and credit them.",
+     eg:["All questions written by me from my lecture notes.","Diagrams adapted from OpenStax Biology, CC BY 4.0, credited in the footer."]}},
+  {k:"license", label:"Open license you will use", hint:"CC BY 4.0 is a common default for open educational resources.",
+   ph:"CC BY 4.0", small:true,
+   help:{q:["Are you happy for others to adapt your app as long as they credit you?"],
+     p:"CC BY 4.0 allows reuse and adaptation with credit. CC BY-NC adds a non-commercial restriction, which some open education programs do not accept. Check what your program requires.",
+     eg:["CC BY 4.0"]}}
+];
+
+var CHECKS = [
+  ["Privacy", ["The app asks for no names, student IDs, emails, or other personal information.","The app sends nothing to an outside server.","There are no passwords, keys, or tokens anywhere in the file."]],
+  ["Accessibility", ["Everything works with the keyboard alone, and I can always see where I am.","I ran a free checker such as WAVE or axe DevTools and fixed what it found.","Color is never the only way information is shown, and the text is readable at 200% zoom.","Images have alt text; any audio or video has captions or a transcript."]],
+  ["Content and function", ["I fact-checked every question, answer, and piece of feedback myself.","I tested it on a computer and on a phone.","I tested it in my LMS in student view.","The app shows my name, the license, and how to report a problem.","Every source I used is mine, public domain, or openly licensed, and credited."]]
+];
+
+var STORE = "oerAppPlanner.v1";
+var state = {brief:{}, checks:{}, opts:{}, scan:""};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function val(k){ return (state.brief[k]||"").trim(); }
+function answered(){ var n=0; FIELDS.forEach(function(f){ if(val(f.k)) n++; }); return n; }
+function words(s){ return s.split(/\s+/).filter(Boolean).length; }
+
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
+function load(){
+  try{ var s=localStorage.getItem(STORE); if(s){ var d=JSON.parse(s); if(d.brief) state.brief=d.brief; if(d.checks) state.checks=d.checks; if(d.opts) state.opts=d.opts; if(d.scan) state.scan=d.scan; } }catch(e){}
+}
+
+/* ---- theme ---- */
+var themeBtn = $("themeBtn");
+try{ var t=localStorage.getItem(STORE+".theme"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+function syncTheme(){
+  var dark = document.documentElement.getAttribute("data-theme")==="dark" ||
+    (!document.documentElement.hasAttribute("data-theme") && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  themeBtn.textContent = dark ? "Light mode" : "Dark mode";
+  themeBtn.setAttribute("aria-pressed", dark ? "true":"false");
+}
+themeBtn.addEventListener("click", function(){
+  var dark = themeBtn.getAttribute("aria-pressed")==="true";
+  var next = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem(STORE+".theme", next); }catch(e){}
+  syncTheme();
+});
+syncTheme();
+
+/* ---- navigation ---- */
+var STEPS = ["brief","check","prompt","safety"];
+function go(step){
+  STEPS.forEach(function(s){ $("step-"+s).hidden = (s!==step); });
+  var btns = document.querySelectorAll("nav button");
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].getAttribute("data-step")===step) btns[i].setAttribute("aria-current","step");
+    else btns[i].removeAttribute("aria-current");
+  }
+  if(step==="prompt") renderPrompt();
+  $("main").focus();
+  window.scrollTo(0,0);
+}
+document.addEventListener("click", function(ev){
+  var n = ev.target.closest ? ev.target.closest("nav button") : null;
+  if(n){ go(n.getAttribute("data-step")); return; }
+  var g = ev.target.closest ? ev.target.closest("[data-go]") : null;
+  if(g) go(g.getAttribute("data-go"));
+});
+
+/* ---- step 1: fields ---- */
+function helpHTML(f){
+  var h = f.help||{}, out = "";
+  if(h.q && h.q.length){ out += "<p><strong>Ask yourself</strong></p><ul>" + h.q.map(function(q){ return "<li>"+esc(q)+"</li>"; }).join("") + "</ul>"; }
+  if(h.p){ out += "<p>"+esc(h.p)+"</p>"; }
+  if(h.eg && h.eg.length){ out += "<p><strong>Example answers</strong></p><ul>" + h.eg.map(function(e){ return '<li class="eg">'+esc(e)+"</li>"; }).join("") + "</ul>"; }
+  return out;
+}
+function renderFields(){
+  var wrap = $("fields");
+  FIELDS.forEach(function(f){
+    var d = document.createElement("div");
+    d.className = "field";
+    d.innerHTML =
+      '<label for="f-'+f.k+'">'+esc(f.label)+'</label>' +
+      (f.hint ? '<p class="hint" id="h-'+f.k+'">'+esc(f.hint)+'</p>' : '') +
+      '<textarea id="f-'+f.k+'" placeholder="Example: '+esc(f.ph)+'"'+(f.hint?' aria-describedby="h-'+f.k+'"':'')+(f.small?' rows="1" style="min-height:2.7rem"':'')+'></textarea>' +
+      '<details><summary>Need help with this one?</summary><div class="det-body">'+helpHTML(f)+'</div></details>';
+    wrap.appendChild(d);
+    var ta = d.querySelector("textarea");
+    ta.value = state.brief[f.k] || "";
+    ta.addEventListener("input", function(){ state.brief[f.k]=ta.value; save(); meter(); });
+  });
+}
+function meter(){
+  var n = answered();
+  $("meterText").textContent = n + " of " + FIELDS.length + " answered";
+  $("meterBar").style.width = (n/FIELDS.length*100)+"%";
+  var btns = document.querySelectorAll("nav button");
+  if(btns[0]) btns[0].classList.toggle("done", n===FIELDS.length);
+}
+function briefMarkdown(){
+  return "# App brief\n\n" + FIELDS.map(function(f){ return "## "+f.label+"\n\n"+(val(f.k)||"_Not answered yet_"); }).join("\n\n")+"\n";
+}
+$("dlBrief").addEventListener("click", function(){
+  download("app-brief.md", briefMarkdown(), "text/markdown", $("briefStatus"));
+});
+$("copyBrief").addEventListener("click", function(){
+  copyText(briefMarkdown(), $("briefStatus"), "Brief copied. Paste it wherever you keep your notes.");
+});
+$("clearAll").addEventListener("click", function(){
+  if(!window.confirm("Start over? This clears your answers and checklist in this browser.")) return;
+  state = {brief:{}, checks:{}, opts:{}, scan:""};
+  save();
+  FIELDS.forEach(function(f){ $("f-"+f.k).value=""; });
+  $("planOut").innerHTML=""; $("scanOut").innerHTML=""; $("codeIn").value="";
+  renderChecklist(); meter();
+  $("briefStatus").textContent = "Cleared.";
+});
+
+/* ---- step 2: plan check ---- */
+var VAGUE = /\b(understand|understands|understanding|know|knows|learn about|be familiar|be aware|appreciate|grasp)\b/i;
+var OBSERVABLE = /\b(calculat|classif|identif|choos|select|order|sort|match|label|solv|writ|explain|compar|predict|diagnos|convert|interpret|apply|construct|distinguish|rank|estimat|name|list|plan|evaluat|analyz|graph|balanc|translat)/i;
+var BROAD = /\b(whole|entire|all of|everything|throughout the (?:course|semester)|each (?:unit|chapter|week)|every (?:unit|chapter|topic))\b/i;
+var OPENLIC = /\b(cc[\s-]?by|creative commons|openstax|public domain|open(?:ly)? licen[cs]ed|my own|i wrote|mine|original)\b/i;
+var RISKYSRC = /\b(test bank|publisher|textbook (?:figure|image|scan)|google image|scanned|pearson|mcgraw|cengage|wiley)\b/i;
+
+function planCheck(){
+  var notes = [], good = [], n = answered();
+  if(n < FIELDS.length){
+    var missing = FIELDS.filter(function(f){ return !val(f.k); });
+    notes.push({f:missing[0].k, t:"Finish the plan first. Still blank: " + missing.map(function(f){ return f.label.split(":")[0].split("?")[0]; }).join(", ") + "."});
+  }
+  var goal = val("goal");
+  if(goal){
+    if(VAGUE.test(goal) && !OBSERVABLE.test(goal)) notes.push({f:"goal", t:"Your goal uses a word you cannot observe, such as \u201cunderstand.\u201d Replace it with something you could watch a student do: calculate, classify, choose, order, explain."});
+    else if(OBSERVABLE.test(goal)) good.push("Your learning goal names something you can actually see a student do.");
+  }
+  var prob = val("problem");
+  if(prob){
+    if(BROAD.test(prob) || words(prob) > 45) notes.push({f:"problem", t:"The learning problem reads broad. A first app works best on one specific skill or misconception, not a whole unit. Narrow it to the single thing that trips students up most."});
+    else if(words(prob) >= 6) good.push("The learning problem is specific enough to build against.");
+  }
+  var fb = val("feedback");
+  if(fb){
+    if(words(fb) < 12) notes.push({f:"feedback", t:"Say more about the feedback for wrong answers. Name the common mistakes and what the app should say about each. This is where students learn most."});
+    else if(/wrong|incorrect|miss|error|hint|retry|try again/i.test(fb)) good.push("You have described what happens on a wrong answer, which is the part that teaches.");
+  }
+  var does = val("does");
+  if(does && words(does) < 10) notes.push({f:"does", t:"Walk through the student's visit in a little more detail: what they see first, what they click or type, and how they know they are done."});
+  var done = val("done");
+  if(done && words(done) > 55) notes.push({f:"done", t:"Your \u201cdone\u201d list looks ambitious for a first build. Pick the smallest version you would still assign, and keep the rest as a later round."});
+  var src = val("sources");
+  if(src){
+    if(RISKYSRC.test(src)) notes.push({f:"sources", t:"One of your sources may not be yours to share. Publisher material, scanned figures, and search-engine images cannot go into an open resource. Substitute your own content or an openly licensed source."});
+    else if(OPENLIC.test(src)) good.push("Your content sources look clear for open sharing.");
+  }
+  var learners = val("learners");
+  if(learners && !/phone|mobile|laptop|computer|tablet|device|chromebook/i.test(learners)) notes.push({f:"learners", t:"Add which devices students will use. If they are mostly on phones, the app needs to be built for a small screen from the start."});
+  var lic = val("license");
+  if(lic && !OPENLIC.test(lic) && !/cc/i.test(lic)) notes.push({f:"license", t:"Name a specific open license, such as CC BY 4.0, so others know what they may do with your app."});
+  return {notes:notes, good:good, complete:n===FIELDS.length};
+}
+$("planBtn").addEventListener("click", function(){
+  if(answered()===0){ $("planStatus").textContent = "Answer some of the plan first."; return; }
+  var r = planCheck();
+  var level = (!r.complete || r.notes.length>2) ? "work" : r.notes.length ? "almost" : "ready";
+  var label = level==="ready" ? "Ready to build" : level==="almost" ? "Almost there" : "A few things to tighten";
+  var html = '<div class="card"><p class="verdict '+level+'">'+label+'</p><p>'+
+    (r.notes.length ? "Look at "+r.notes.length+" item"+(r.notes.length>1?"s":"")+" below. These are common snags, not rules, so use your judgment."
+                    : "Nothing stands out. Move on to your prompt.")+"</p></div>";
+  if(r.good.length) html += '<h2>Working well</h2><ul class="clean">'+r.good.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("")+"</ul>";
+  if(r.notes.length) html += '<h2>Worth another look</h2><ul class="clean">'+r.notes.map(function(x){
+      var f = FIELDS.filter(function(y){ return y.k===x.f; })[0];
+      return "<li>"+(f?'<button type="button" class="linkish" data-jump="'+f.k+'">'+esc(f.label.split(":")[0].split("?")[0])+"</button>: ":"")+esc(x.t)+"</li>";
+    }).join("")+'</ul><p class="hint">Select a question name to jump back to it.</p>';
+  $("planOut").innerHTML = html;
+  $("planStatus").textContent = "Check complete.";
+});
+$("planOut").addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("[data-jump]") : null;
+  if(!b) return;
+  go("brief");
+  var ta = $("f-"+b.getAttribute("data-jump"));
+  ta.scrollIntoView({block:"center"}); ta.focus();
+});
+
+/* ---- step 3: prompt ---- */
+function briefText(){
+  return FIELDS.map(function(f){ return "- " + f.label + ": " + (val(f.k) || "(not answered)"); }).join("\n");
+}
+function buildPrompt(){
+  var lms = $("optLMS").checked, stages = $("optSteps").checked, explain = $("optExplain").checked;
+  var p = "I am a college instructor building a small interactive learning app for my students. It will be shared as an open educational resource. I do not write code, so please explain anything I need to decide in plain language.\n\n";
+  p += "MY PLAN\n" + briefText() + "\n\n";
+  p += "REQUIREMENTS\n";
+  p += "- Build it as ONE self-contained HTML file: all HTML, CSS, and JavaScript inline. No external libraries, fonts, images, or scripts.\n";
+  p += "- Privacy: no login, no data collection, and no network requests of any kind (no fetch, no XMLHttpRequest, no submitting forms, no analytics). Never ask for a name, student ID, or email.\n";
+  p += "- Accessibility (WCAG 2.1 AA): fully keyboard operable with a visible focus outline, semantic HTML with real labels, feedback announced to screen readers with aria-live, contrast of at least 4.5:1, never color alone to carry meaning, alt text on images, and respect reduced-motion settings.\n";
+  p += "- Responsive: works on a phone and on a laptop, and stays usable at 200% zoom.\n";
+  p += "- Include a footer with my name, the license, and a line telling students how to report a problem.\n";
+  p += "- Plain, uncluttered design, with instructions a student can follow without me there.\n";
+  if(lms) p += "- LMS compatibility: use ES5 JavaScript only (var and function declarations; no arrow functions, let, const, classes, template literals, async or await), flat global functions with no wrapper functions around the whole script, synchronous DOM updates, and CSS-only animation rather than chained timers.\n";
+  p += "\nCONTENT RULES\n";
+  p += "- Do not invent facts, figures, formulas, citations, or clinical values. If you need content I have not given you, ask me for it or clearly mark it as placeholder text for me to replace.\n";
+  p += "- Keep the scope to what I described above. Do not add extra features I did not ask for.\n";
+  p += "\n";
+  if(stages){
+    p += "HOW TO WORK WITH ME\n";
+    p += "Build this in stages. First describe the plan in a few sentences and wait for me to agree. Then build the working version. Then stop and let me ask for changes one at a time.\n\n";
+  } else {
+    p += "Please build the complete app now.\n\n";
+  }
+  if(explain){
+    p += "AFTER THE CODE\n";
+    p += "Give me, in plain language: what a student sees and does, how the feedback works, confirmation that nothing is stored or sent anywhere, and three specific things I should test myself.\n";
+  }
+  return p.replace(/\s+$/,"");
+}
+function renderPrompt(){ $("promptBox").textContent = buildPrompt(); }
+["optLMS","optSteps","optExplain"].forEach(function(id){
+  var el = $(id);
+  if(state.opts && typeof state.opts[id]==="boolean") el.checked = state.opts[id];
+  el.addEventListener("change", function(){ state.opts[id]=el.checked; save(); renderPrompt(); });
+});
+$("copyPrompt").addEventListener("click", function(){
+  copyText(buildPrompt(), $("copyStatus"), "Copied. Paste it into your AI tool and send it.");
+});
+$("dlPrompt").addEventListener("click", function(){ download("build-prompt.txt", buildPrompt(), "text/plain", $("copyStatus")); });
+
+/* ---- step 4: scan ---- */
+var RULES = [
+  {name:"Network requests", re:/\bfetch\s*\(|XMLHttpRequest|sendBeacon|new\s+WebSocket|EventSource/gi, sev:"flag", why:"The app may send or receive data from an outside server. Ask the AI to remove it."},
+  {name:"Form submission", re:/<form[^>]*\baction\s*=/gi, sev:"flag", why:"A form with an action can send student input somewhere. Ask for a form that handles everything in the page."},
+  {name:"Files from other sites", re:/<(?:script|link|img|iframe|video|audio|source)[^>]+(?:src|href)\s*=\s*["']?https?:/gi, sev:"flag", why:"The app loads something from another website. Ask for a self-contained file."},
+  {name:"Web addresses in the code", re:/https?:\/\/[^\s"'<>)]+/gi, sev:"check", why:"Check each address is one you intended.", list:true},
+  {name:"Embedded frames", re:/<iframe/gi, sev:"flag", why:"Frames pull in content from elsewhere. Ask for the content to be built into the page."},
+  {name:"Passwords or keys", re:/(api[_-]?key|secret|password|bearer\s+[a-z0-9]|access[_-]?token)/gi, sev:"flag", why:"Keys and passwords must never appear in a file students can open."},
+  {name:"Browser storage", re:/localStorage|sessionStorage|indexedDB|document\.cookie/gi, sev:"check", why:"Allowed if it stays on the student's own device. Confirm nothing identifying is stored."},
+  {name:"Redirects and pop-ups", re:/window\.open\s*\(|location\.(?:href|assign|replace)\s*=|window\.location\s*=/gi, sev:"flag", why:"The app may send students to another page."},
+  {name:"Code built from text", re:/\beval\s*\(|new\s+Function\s*\(/gi, sev:"flag", why:"Running text as code is hard to review and usually unnecessary here."},
+  {name:"Asks for personal details", re:/(student\s*id|\bssn\b|date of birth|\bdob\b|email|full name|your name)/gi, sev:"check", why:"Confirm the app is not collecting anything identifying. Practice apps should not need it.", list:true},
+  {name:"LMS: modern JavaScript", re:/=>|\blet\s+[a-zA-Z_$]|\bconst\s+[a-zA-Z_$]|\bclass\s+[A-Z]\w*\s*\{|`|\basync\s+function|\bawait\s/g, sev:"check", why:"Some LMS tools need older ES5 JavaScript. If it misbehaves after upload, ask the AI to rewrite it in ES5.", js:true},
+  {name:"LMS: timer chains", re:/setTimeout|setInterval/g, sev:"check", why:"Timers can be unreliable inside an LMS. CSS animation is safer.", js:true}
+];
+function scriptText(code){
+  var out="", re=/<script\b[^>]*>([\s\S]*?)<\/script>/gi, m;
+  while((m=re.exec(code))) out += m[1]+"\n";
+  return out;
+}
+function runScan(code){
+  var js = scriptText(code), rows = [];
+  RULES.forEach(function(r){
+    var src = r.js ? js : code;
+    var hits = src.match(r.re) || [];
+    if(r.name==="Web addresses in the code") hits = hits.filter(function(u){ return !/w3\.org|creativecommons\.org/i.test(u); });
+    var uniq = [];
+    hits.forEach(function(h){ if(uniq.indexOf(h)<0 && uniq.length<5) uniq.push(h); });
+    rows.push({name:r.name, sev:hits.length?r.sev:"pass", count:hits.length, why:r.why, sample:r.list?uniq:[]});
+  });
+  var imgs = code.match(/<img\b[^>]*>/gi) || [];
+  var noAlt = 0;
+  imgs.forEach(function(t){ if(!/\balt\s*=/i.test(t)) noAlt++; });
+  rows.push({name:"Images missing alt text", sev:noAlt?"flag":"pass", count:noAlt, why:"Every image needs alt text, or alt=\"\" if it is purely decorative.", sample:[]});
+  rows.push({name:"Page language set", sev:/<html[^>]*\blang\s*=/i.test(code)?"pass":"flag", count:0, why:"Add lang=\"en\" to the html tag so screen readers pronounce the text correctly.", sample:[]});
+  rows.push({name:"Page title", sev:/<title>\s*\S/i.test(code)?"pass":"flag", count:0, why:"A title tells assistive technology and the LMS what the page is.", sample:[]});
+  rows.push({name:"Keyboard-reachable controls", sev:/onclick\s*=\s*["'][^"']/i.test(code) && !/<button/i.test(code) ? "flag":"pass", count:0, why:"Clickable things built from div or span tags cannot be reached by keyboard. Ask for real button elements.", sample:[]});
+  rows.push({name:"Feedback announced to screen readers", sev:/aria-live|role\s*=\s*["']?(?:alert|status)/i.test(code)?"pass":"check", count:0, why:"Feedback that appears after an answer should be announced. Ask for aria-live on the feedback area.", sample:[]});
+  return rows;
+}
+function renderScan(rows){
+  var flags=0, checks=0;
+  rows.forEach(function(r){ if(r.sev==="flag") flags++; else if(r.sev==="check") checks++; });
+  var level = flags ? "work" : checks ? "almost" : "ready";
+  var head = flags ? flags+" thing"+(flags>1?"s":"")+" to fix" : checks ? "Nothing broken, "+checks+" to confirm" : "Nothing flagged";
+  var html = '<h2>Scan results</h2><div class="card"><p class="verdict '+level+'">'+head+'</p>'+
+    '<p>Ask your AI tool to fix anything marked Fix, then paste the new code and scan again.</p></div>'+
+    '<div class="scroll"><table class="scan"><caption class="sr">Scan results</caption><thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">What it means</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var pill = r.sev==="pass" ? '<span class="pill pass">Pass</span>'
+      : r.sev==="flag" ? '<span class="pill flag">Fix'+(r.count?" ("+r.count+")":"")+'</span>'
+      : '<span class="pill check">Confirm'+(r.count?" ("+r.count+")":"")+'</span>';
+    html += '<tr><th scope="row">'+esc(r.name)+'</th><td>'+pill+'</td><td>'+
+      (r.sev==="pass" ? "Nothing found." : esc(r.why)+(r.sample.length?'<br><span class="mono" style="color:var(--muted)">'+r.sample.map(esc).join("<br>")+'</span>':""))+
+      '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  $("scanOut").innerHTML = html;
+  state.scan = rows.map(function(r){
+    return "- "+r.name+": "+(r.sev==="pass" ? "Pass" : (r.sev==="flag"?"FIX":"Confirm")+(r.count?" ("+r.count+")":"")+" \u2014 "+r.why);
+  }).join("\n");
+  save();
+}
+$("scanBtn").addEventListener("click", function(){
+  var code = $("codeIn").value;
+  if(!code.trim()){ $("scanStatus").textContent = "Paste your app code first."; return; }
+  renderScan(runScan(code));
+  $("scanStatus").textContent = "Scan complete.";
+});
+$("tryBtn").addEventListener("click", function(){
+  var code = $("codeIn").value;
+  if(!code.trim()){ $("scanStatus").textContent = "Paste your app code first."; return; }
+  var w = window.open("", "_blank");
+  if(!w){ $("scanStatus").textContent = "Your browser blocked the preview window. Allow pop-ups, or save the code as an .html file and open it."; return; }
+  w.document.open(); w.document.write(code); w.document.close();
+  $("scanStatus").textContent = "Preview opened in a new tab. Try it with the keyboard alone.";
+});
+function renderChecklist(){
+  var i=0, html="";
+  CHECKS.forEach(function(g){
+    html += '<fieldset><legend>'+esc(g[0])+'</legend>';
+    g[1].forEach(function(t){
+      var id = "ck"+(i++);
+      html += '<div class="check-item"><input type="checkbox" id="'+id+'" data-t="'+esc(t)+'"'+(state.checks[t]?" checked":"")+'><label for="'+id+'">'+esc(t)+'</label></div>';
+    });
+    html += '</fieldset>';
+  });
+  $("checklist").innerHTML = html;
+}
+$("checklist").addEventListener("change", function(ev){
+  var t = ev.target.getAttribute("data-t");
+  if(!t) return;
+  state.checks[t] = ev.target.checked;
+  save();
+});
+function packetMarkdown(){
+  return "# OER app summary\n\nPrepared " + new Date().toLocaleDateString() + "\n\n## The plan\n\n" + briefText() +
+    "\n\n## Automatic scan\n\n" + (state.scan || "_Not run_") + "\n\n## Checklist\n\n" +
+    CHECKS.map(function(g){
+      return "### "+g[0]+"\n\n"+g[1].map(function(t){ return "- ["+(state.checks[t]?"x":" ")+"] "+t; }).join("\n");
+    }).join("\n\n") + "\n\n## Reviewer\n\nReviewer: ____________   Date: ____________   Approved / Changes needed\n";
+}
+$("dlPacket").addEventListener("click", function(){
+  download("oer-app-summary.md", packetMarkdown(), "text/markdown", $("scanStatus"));
+});
+$("copyPacket").addEventListener("click", function(){
+  copyText(packetMarkdown(), $("scanStatus"), "Summary copied.");
+});
+
+/* ---- copy and download helpers ---- */
+function copyText(text, statusEl, okMsg){
+  function fallback(){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly","readonly");
+    ta.style.position="fixed"; ta.style.top="-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    var done = false;
+    try{ done = document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+    if(statusEl) statusEl.textContent = done ? okMsg : "Your browser blocked copying. Use the download button instead.";
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      if(statusEl) statusEl.textContent = okMsg;
+    })["catch"](fallback);
+  } else fallback();
+}
+function download(filename, text, type, statusEl){
+  try{
+    var blob = new Blob([text], {type:type+";charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    if(statusEl) statusEl.textContent = "Saved "+filename+". If nothing downloaded, use the copy button instead.";
+  }catch(e){
+    if(statusEl) statusEl.textContent = "Your browser blocked the download. Use the copy button instead.";
+  }
+}
+
+/* ---- init ---- */
+load();
+renderFields();
+renderChecklist();
+renderPrompt();
+meter();
+})();
+</script>
+</body>
+</html>
